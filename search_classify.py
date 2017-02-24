@@ -114,22 +114,9 @@ def train_classifier(color_space='RGB', hog_channel='ALL',
 ):
 
     # Read in cars and notcars
-    # car_images = glob.glob('vehicles_smallest/*.jpeg')
-    # cars = []
-    # notcars = []
-    # for car_image in images:
-    #     if 'image' in image or 'extra' in image:
-    #         notcars.append(image)
-    #     else:
-    #         cars.append(image)
 
     cars = glob.glob('data/vehicles/*/*.png')
     notcars = glob.glob('data/non-vehicles/*/*.png')
-
-    # cars = glob.glob('data/vehicles_smallset/*/*.jpeg')
-    # notcars = glob.glob('data/non-vehicles_smallset/*/*.jpeg')
-
-    # print(cars)
 
     # Reduce the sample size because
     # The quiz evaluator times out after 13s of CPU time
@@ -140,32 +127,9 @@ def train_classifier(color_space='RGB', hog_channel='ALL',
     ### TODO: Tweak these parameters and see how the results change.
     # color_space = 'RGB' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
 
-    # color_space = 'HLS'
-    # spatial_size = (16, 16) # Spatial binning dimensions
-    # Using: 9 orientations 8 pixels per cell and 2 cells per block
-    #Feature vector length: 6156
-    #9.16 Seconds to train SVC...
-    #Test Accuracy of SVC =  0.9924
-
-    # spatial_size = (32, 32)
-    # Using: 9 orientations 8 pixels per cell and 2 cells per block
-    # Feature vector length: 8460
-    # 6.26 Seconds to train SVC...
-    # Test Accuracy of SVC =  0.9918
-
-    # color_space = 'LUV'
-    #Using: 9 orientations 8 pixels per cell and 2 cells per block
-    #Feature vector length: 8460
-    #5.8 Seconds to train SVC...
-    #Test Accuracy of SVC =  0.9935
-
     orient = 9  # HOG orientations
     pix_per_cell = 8 # HOG pixels per cell
     cell_per_block = 2 # HOG cells per block
-
-    # hog_channel = 1 # Can be 0, 1, 2, or "ALL"
-    # hog_channel = 'ALL'
-    # hog_channel = 2
 
     # hist_bins = 16    # Number of histogram bins
     hist_bins = 32
@@ -286,15 +250,16 @@ def tracking_pipeline(image, svc, X_scaler, y_start_stop=[350, 700], color_space
     # Visualize the heatmap when displaying
     heatmap = np.clip(heat, 0, 255)
 
-    if smooth:
-        # print("smoothing")
-        # Average the heatmap over past 4 frames
-        if len(globals.heatmaps) == 4:
-            globals.heatmaps.append(heatmap)
-            globals.heatmaps.pop()
-            heatmap = np.mean(globals.heatmaps, axis=0)
-        else:
-            globals.heatmaps.append(heatmap)
+    # TODO: get smoothing working properly
+    # if smooth:
+    #     # print("smoothing")
+    #     # Average the heatmap over past 4 frames
+    #     if len(globals.heatmaps) == 4:
+    #         globals.heatmaps.append(heatmap)
+    #         globals.heatmaps.pop()
+    #         heatmap = np.mean(globals.heatmaps, axis=0)
+    #     else:
+    #         globals.heatmaps.append(heatmap)
 
     if stage == 'heat':
         return heatmap
