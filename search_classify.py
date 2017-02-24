@@ -13,6 +13,10 @@ from lesson_functions import *
 # from sklearn.model_selection import train_test_split
 from sklearn.cross_validation import train_test_split
 
+from scipy.ndimage.measurements import label
+
+import globals
+
 # Define a function to extract features from a single image window
 # This function is very similar to extract_features()
 # just for a single image rather than list of images
@@ -105,7 +109,9 @@ def search_windows(img, windows, clf, scaler, color_space='RGB',
     #8) Return windows for positive detections
     return on_windows
 
-def tracking_pipeline():
+def train_classifier(color_space='RGB', hog_channel='ALL',
+                     spatial_size=(32, 32)
+):
 
     # Read in cars and notcars
     # car_images = glob.glob('vehicles_smallest/*.jpeg')
@@ -117,41 +123,69 @@ def tracking_pipeline():
     #     else:
     #         cars.append(image)
 
-    cars = glob.glob('vehicles_smallset/*/*.jpeg')
-    notcars = glob.glob('non-vehicles_smallset/*/*.jpeg')
+    cars = glob.glob('data/vehicles/*/*.png')
+    notcars = glob.glob('data/non-vehicles/*/*.png')
+
+    # cars = glob.glob('data/vehicles_smallset/*/*.jpeg')
+    # notcars = glob.glob('data/non-vehicles_smallset/*/*.jpeg')
 
     # print(cars)
 
     # Reduce the sample size because
     # The quiz evaluator times out after 13s of CPU time
-    sample_size = 500
-    cars = cars[0:sample_size]
-    notcars = notcars[0:sample_size]
+    # sample_size = 500
+    # cars = cars[0:sample_size]
+    # notcars = notcars[0:sample_size]
 
     ### TODO: Tweak these parameters and see how the results change.
-    color_space = 'RGB' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+    # color_space = 'RGB' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+
+    # color_space = 'HLS'
+    # spatial_size = (16, 16) # Spatial binning dimensions
+    # Using: 9 orientations 8 pixels per cell and 2 cells per block
+    #Feature vector length: 6156
+    #9.16 Seconds to train SVC...
+    #Test Accuracy of SVC =  0.9924
+
+    # spatial_size = (32, 32)
+    # Using: 9 orientations 8 pixels per cell and 2 cells per block
+    # Feature vector length: 8460
+    # 6.26 Seconds to train SVC...
+    # Test Accuracy of SVC =  0.9918
+
+    # color_space = 'LUV'
+    #Using: 9 orientations 8 pixels per cell and 2 cells per block
+    #Feature vector length: 8460
+    #5.8 Seconds to train SVC...
+    #Test Accuracy of SVC =  0.9935
+
     orient = 9  # HOG orientations
     pix_per_cell = 8 # HOG pixels per cell
     cell_per_block = 2 # HOG cells per block
-    hog_channel = 0 # Can be 0, 1, 2, or "ALL"
-    spatial_size = (16, 16) # Spatial binning dimensions
-    hist_bins = 16    # Number of histogram bins
+
+    # hog_channel = 1 # Can be 0, 1, 2, or "ALL"
+    # hog_channel = 'ALL'
+    # hog_channel = 2
+
+    # hist_bins = 16    # Number of histogram bins
+    hist_bins = 32
+
     spatial_feat = True # Spatial features on or off
     hist_feat = True # Histogram features on or off
     hog_feat = True # HOG features on or off
-    y_start_stop = [None, None] # Min and max in y to search in slide_window()
 
-    car_features = extract_features(cars, color_space=color_space, 
-                                    spatial_size=spatial_size, hist_bins=hist_bins, 
-                                    orient=orient, pix_per_cell=pix_per_cell, 
-                                    cell_per_block=cell_per_block, 
-                                    hog_channel=hog_channel, spatial_feat=spatial_feat, 
+    car_features = extract_features(cars, color_space=color_space,
+                                    spatial_size=spatial_size, hist_bins=hist_bins,
+                                    orient=orient, pix_per_cell=pix_per_cell,
+                                    cell_per_block=cell_per_block,
+                                    hog_channel=hog_channel, spatial_feat=spatial_feat,
                                     hist_feat=hist_feat, hog_feat=hog_feat)
-    notcar_features = extract_features(notcars, color_space=color_space, 
-                                       spatial_size=spatial_size, hist_bins=hist_bins, 
-                                       orient=orient, pix_per_cell=pix_per_cell, 
-                                       cell_per_block=cell_per_block, 
-                                       hog_channel=hog_channel, spatial_feat=spatial_feat, 
+
+    notcar_features = extract_features(notcars, color_space=color_space,
+                                       spatial_size=spatial_size, hist_bins=hist_bins,
+                                       orient=orient, pix_per_cell=pix_per_cell,
+                                       cell_per_block=cell_per_block,
+                                       hog_channel=hog_channel, spatial_feat=spatial_feat,
                                        hist_feat=hist_feat, hog_feat=hog_feat)
 
     X = np.vstack((car_features, notcar_features)).astype(np.float64)
@@ -188,16 +222,46 @@ def tracking_pipeline():
     # Check the prediction time for a single sample
     t=time.time()
 
-    image = mpimg.imread('bbox-example-image.jpg')
+    return svc, X_scaler
+
+def tracking_pipeline(image, svc, X_scaler, y_start_stop=[350, 700], color_space='LUV', hog_channel='ALL', orient=9, pix_per_cell=8, cell_per_block=2, spatial_feat=True, hist_feat=True, hog_feat=True, spatial_size=(32, 32), hist_bins=32, stage='final', smooth=False):
+
     draw_image = np.copy(image)
 
     # Uncomment the following line if you extracted training
     # data from .png images (scaled 0 to 1 by mpimg) and the
     # image you are searching is a .jpg (scaled 0 to 255)
-    #image = image.astype(np.float32)/255
+    # image = image.astype(np.float32)/255
 
-    windows = slide_window(image, x_start_stop=[None, None], y_start_stop=y_start_stop,
-                           xy_window=(96, 96), xy_overlap=(0.5, 0.5))
+    # small_windows = slide_window(image, x_start_stop=[None, None], y_start_stop=y_start_stop, xy_window=(48, 48), xy_overlap=(0., 0.75))
+
+    # print("small_windows size", len(small_windows))
+
+    small_windows = slide_window(image, x_start_stop=[None, None], y_start_stop=[350, 414], xy_window=(64, 64), xy_overlap=(0.8, 0.8))
+    # small_windows = []
+
+    # print("medium_windows size", len(medium_windows))
+
+    medium_windows = slide_window(image, x_start_stop=[None, None], y_start_stop=[350, 520], xy_window=(96, 96), xy_overlap=(0.8, 0.8))
+    # medium_windows = []
+
+    medium_windows2 = slide_window(image, x_start_stop=[None, None], y_start_stop=[350, 540], xy_window=(128, 128), xy_overlap=(0.8, 0.8))
+    # medium_windows2 = []
+
+    # print("medium_windows3 size", len(medium_windows3))
+
+    large_windows = slide_window(image, x_start_stop=[None, None], y_start_stop=[350, 700], xy_window=(192, 192), xy_overlap=(0.75, 0.75))
+    # large_windows = []
+
+    # print("large_windows size", len(large_windows))
+
+    # windows = small_windows + medium_windows + medium_windows2 + medium_windows3 + large_windows
+
+    # windows = small_windows + medium_windows + medium_windows2 + medium_windows3 + large_windows
+
+    windows = small_windows + medium_windows + medium_windows2 + large_windows
+
+    # print("total windows size", len(windows))
 
     hot_windows = search_windows(image, windows, svc, X_scaler, color_space=color_space,
                                  spatial_size=spatial_size, hist_bins=hist_bins,
@@ -206,8 +270,37 @@ def tracking_pipeline():
                                  hog_channel=hog_channel, spatial_feat=spatial_feat,
                                  hist_feat=hist_feat, hog_feat=hog_feat)
 
-    window_img = draw_boxes(draw_image, hot_windows, color=(0, 0, 255), thick=6)
+    # print(hot_windows)
+    if stage == 'hot':
+        window_img = draw_boxes(draw_image, hot_windows, color=(0, 0, 255), thick=6)
+        return window_img
 
-    # plt.imshow(window_img)
+    heat = np.zeros_like(image[:,:,0]).astype(np.float)
 
-    return window_img
+    # Add heat to each box in box list
+    heat = add_heat(heat, hot_windows)
+
+    # Apply threshold to help remove false positives
+    heat = apply_heat_threshold(heat, 1)
+
+    # Visualize the heatmap when displaying
+    heatmap = np.clip(heat, 0, 255)
+
+    if smooth:
+        # print("smoothing")
+        # Average the heatmap over past 4 frames
+        if len(globals.heatmaps) == 4:
+            globals.heatmaps.append(heatmap)
+            globals.heatmaps.pop()
+            heatmap = np.mean(globals.heatmaps, axis=0)
+        else:
+            globals.heatmaps.append(heatmap)
+
+    if stage == 'heat':
+        return heatmap
+
+    # Find final boxes from heatmap using label function
+    labels = label(heatmap)
+    draw_img = draw_labeled_bboxes(np.copy(image), labels)
+
+    return draw_img

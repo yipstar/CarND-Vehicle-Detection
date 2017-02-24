@@ -1,0 +1,4 @@
+Perhaps you could screen shot some of the frames in the video with false positives.
+There will always be some level of false positives in the video, no matter how good your classifier. We just have to get them down to a manageable level. Then we do some sort of averaging over several frames of the video, and only accept detected pixels that are hot for some number of consecutive frames. Have you implemented this?
+
+Try averaging heatmap across multiple frames. Kind of keep 3 - 5 heatmaps from the previous frames and then calculate the mean.
